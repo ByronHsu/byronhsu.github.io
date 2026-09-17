@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'"
+    />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rollout Simulator and Explorer</title>
+    <style>
+      :root {
+  color-scheme: light dark;
+  --bg: light-dark(#fafbfc, #11151b);
+  --fg: light-dark(#172331, #e8edf4);
+  --muted: light-dark(#627084, #a1acbd);
+  --line: light-dark(#dce2ea, #2a3543);
+  --surface: light-dark(#fff, #171e27);
+  --sampling: light-dark(#2673db, #76adff);
+  --tool: light-dark(#168b72, #65d0b2);
+  --wait: light-dark(#a27619, #dfbc68);
+  --s3: light-dark(#b266ba, #ce9bd2);
+  --s4: light-dark(#ce643a, #efa278);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    14px system-ui,
+    sans-serif;
+}
+main {
+  max-width: 1500px;
+  margin: auto;
+  padding: 28px;
+}
+header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+h1 {
+  font-size: 24px;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.badge {
+  font-size: 12px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--tool);
+}
+nav {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  margin: 24px 0 18px;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+select {
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+nav button {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0 0 12px;
+  color: var(--muted);
+}
+nav button[aria-selected="true"] {
+  color: var(--fg);
+  border-bottom: 2px solid var(--sampling);
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.controls label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.position {
+  flex: 1;
+  min-width: 150px;
+}
+.position input {
+  width: 100%;
+}
+.time {
+  font-variant-numeric: tabular-nums;
+}
+.legend {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.legend span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+}
+.note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.timeline {
+  position: relative;
+}
+svg {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+}
+.detail {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.detail-grid span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.detail-grid strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px 20px;
+}
+.panel {
+  min-width: 0;
+}
+.panel h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.metric-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.metric-legend button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+.metric-legend button[aria-pressed="false"] {
+  opacity: 0.4;
+}
+.metric-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.source {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 7px;
+  min-height: 30px;
+  line-height: 1.4;
+}
+.tip {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  border-radius: 5px;
+  pointer-events: none;
+  font-size: 12px;
+  z-index: 5;
+  white-space: pre-line;
+  line-height: 1.6;
+  max-width: 270px;
+}
+.empty {
+  font-size: 12px;
+  fill: var(--muted);
+}
+[hidden] {
+  display: none !important;
+}
+footer {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+a {
+  color: var(--sampling);
+}
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .detail-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  main {
+    padding: 16px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Rollout Simulator and Explorer</h1>
+          <p id="subtitle"></p>
+        </div>
+        <span class="badge">Recorded run · simulated tool calls</span>
+      </header>
+      <nav role="tablist" aria-label="Rollout views">
+        <button
+          role="tab"
+          id="timeline-tab"
+          aria-controls="timeline-panel"
+          aria-selected="true"
+        >
+          Timeline</button
+        ><button
+          role="tab"
+          id="metrics-tab"
+          aria-controls="metrics-panel"
+          aria-selected="false"
+        >
+          Engine Metrics
+        </button>
+      </nav>
+      <div class="controls">
+        <label
+          >Window
+          <select id="window">
+            <option value="all">Entire run</option>
+            <option value="5">5 seconds</option>
+            <option value="1">1 second</option>
+          </select></label
+        ><label class="position"
+          >Position
+          <input
+            id="position"
+            aria-label="Time window start"
+            type="range"
+            min="0"
+            max="0"
+            value="0"
+            step="0.01" /></label
+        ><button id="reset">Reset view</button
+        ><span id="range" class="time"></span>
+      </div>
+      <section
+        id="timeline-panel"
+        role="tabpanel"
+        aria-labelledby="timeline-tab"
+      >
+        <div class="legend">
+          <span
+            ><i class="swatch" style="background: var(--sampling)"></i
+            >Sampling</span
+          ><span
+            ><i class="swatch" style="background: var(--tool)"></i>Tool
+            call</span
+          ><span
+            ><i class="swatch" style="background: var(--wait)"></i>Wait</span
+          >
+        </div>
+        <p class="note">
+          Click a phase for turn details. Drag to zoom. Wait = client
+          concurrency queue; sampling includes TTFT. Tiny waits become visible
+          when zoomed.
+        </p>
+        <div class="timeline">
+          <svg
+            id="timeline"
+            role="img"
+            aria-label="Measured conversation timeline"
+          ></svg>
+          <div id="tooltip" class="tip" hidden></div>
+        </div>
+        <p id="availability" class="note"></p>
+        <label
+          >Request
+          <select id="request"></select
+        ></label>
+        <div class="detail" aria-live="polite">
+          <strong id="selected-title"></strong>
+          <div id="details" class="detail-grid"></div>
+        </div>
+      </section>
+      <section
+        id="metrics-panel"
+        role="tabpanel"
+        aria-labelledby="metrics-tab"
+        hidden
+      >
+        <label
+          >Metrics endpoint
+          <select id="exporter"></select
+        ></label>
+        <p class="note">
+          Sources are shown below each chart: client timing distributions use
+          2-second windows; server gauges and counter rates use 1-second
+          scrapes. Gaps mean unavailable, not zero.
+        </p>
+        <div id="metric-grid" class="grid"></div>
+      </section>
+      <footer>
+        Self-contained recording. Tool calls are simulated. Stream timing
+        includes network and scheduling. Missing measurements stay unavailable.
+      </footer>
+    </main>
+    <script>
+      const DATA = {"summary": {"model": "Qwen/Qwen3-1.7B", "duration": 14.964743375778198, "requests": 96, "conversations": 16, "turns": 6, "concurrency": 16, "page_size": 64, "status": "completed", "errors": 0, "error": null}, "rows": [{"conversation": 0, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.024201154708862305, "end": 0.02421116828918457}, {"type": "Sampling", "start": 0.02421116828918457, "end": 0.4934706687927246}], "unavailable": [], "error": null, "ttft": 0.02057097852230072, "latency": 0.4692601412534714, "wait": 6.15045428276062e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 1, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.07745242118835449, "end": 0.07745862007141113}, {"type": "Sampling", "start": 0.07745862007141113, "end": 0.5432882308959961}], "unavailable": [], "error": null, "ttft": 0.05203273706138134, "latency": 0.46582987159490585, "wait": 4.293397068977356e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 2, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.13978910446166992, "end": 0.13979339599609375}, {"type": "Sampling", "start": 0.13979339599609375, "end": 0.5592668056488037}], "unavailable": [], "error": null, "ttft": 0.051194414496421814, "latency": 0.4194736462086439, "wait": 2.6747584342956543e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 3, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.20209121704101562, "end": 0.20209503173828125}, {"type": "Sampling", "start": 0.20209503173828125, "end": 0.5759499073028564}], "unavailable": [], "error": null, "ttft": 0.010558940470218658, "latency": 0.37385501712560654, "wait": 2.3301690816879272e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 4, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.2816920280456543, "end": 0.2816958427429199}, {"type": "Sampling", "start": 0.2816958427429199, "end": 0.6687216758728027}], "unavailable": [], "error": null, "ttft": 0.05202278681099415, "latency": 0.38702617958188057, "wait": 2.421438694000244e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 5, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.33440637588500977, "end": 0.3344099521636963}, {"type": "Sampling", "start": 0.3344099521636963, "end": 0.6733183860778809}], "unavailable": [], "error": null, "ttft": 0.01019962877035141, "latency": 0.3389086686074734, "wait": 2.300366759300232e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 6, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.39209651947021484, "end": 0.39210009574890137}, {"type": "Sampling", "start": 0.39210009574890137, "end": 0.7304022312164307}], "unavailable": [], "error": null, "ttft": 0.010968327522277832, "latency": 0.3383026011288166, "wait": 2.3301690816879272e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 7, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.45103001594543457, "end": 0.4510338306427002}, {"type": "Sampling", "start": 0.4510338306427002, "end": 0.7894637584686279}], "unavailable": [], "error": null, "ttft": 0.011079447343945503, "latency": 0.3384302258491516, "wait": 2.4940818548202515e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 8, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.5130026340484619, "end": 0.5130064487457275}, {"type": "Sampling", "start": 0.5130064487457275, "end": 0.8505620956420898}], "unavailable": [], "error": null, "ttft": 0.010844303295016289, "latency": 0.33755606785416603, "wait": 2.343207597732544e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 9, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.576361894607544, "end": 0.5763659477233887}, {"type": "Sampling", "start": 0.5763659477233887, "end": 0.9142489433288574}], "unavailable": [], "error": null, "ttft": 0.011962948366999626, "latency": 0.33788326010107994, "wait": 2.5480985641479492e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 10, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.6383426189422607, "end": 0.6383464336395264}, {"type": "Sampling", "start": 0.6383464336395264, "end": 0.973182201385498}], "unavailable": [], "error": null, "ttft": 0.011116277426481247, "latency": 0.334835909307003, "wait": 2.421438694000244e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 11, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.7021114826202393, "end": 0.7021152973175049}, {"type": "Sampling", "start": 0.7021152973175049, "end": 1.0298585891723633}], "unavailable": [], "error": null, "ttft": 0.01090865209698677, "latency": 0.3277434669435024, "wait": 2.3674219846725464e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 12, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.7636301517486572, "end": 0.763634443283081}, {"type": "Sampling", "start": 0.763634443283081, "end": 1.0819141864776611}], "unavailable": [], "error": null, "ttft": 0.010926607996225357, "latency": 0.318279767408967, "wait": 2.810731530189514e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 13, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.8272578716278076, "end": 0.8272616863250732}, {"type": "Sampling", "start": 0.8272616863250732, "end": 1.135932445526123}], "unavailable": [], "error": null, "ttft": 0.010800575837492943, "latency": 0.3086709547787905, "wait": 2.3078173398971558e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 14, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.8884868621826172, "end": 0.8884909152984619}, {"type": "Sampling", "start": 0.8884909152984619, "end": 1.1859757900238037}], "unavailable": [], "error": null, "ttft": 0.010771181434392929, "latency": 0.2974850498139858, "wait": 2.5480985641479492e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 15, "turn": 0, "worker": 0, "phases": [{"type": "Wait", "start": 0.9521269798278809, "end": 0.9521307945251465}, {"type": "Sampling", "start": 0.9521307945251465, "end": 1.2353804111480713}], "unavailable": [], "error": null, "ttft": 0.01081857644021511, "latency": 0.2832500822842121, "wait": 2.419576048851013e-06, "context": 1024, "output": 128, "hits": {}}, {"conversation": 3, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.5760848522186279, "end": 1.7200775146484375}, {"type": "Wait", "start": 1.7202932834625244, "end": 1.720299482345581}, {"type": "Sampling", "start": 1.720299482345581, "end": 1.983529806137085}], "unavailable": [], "error": null, "ttft": 0.009997215121984482, "latency": 0.2632303684949875, "wait": 4.161149263381958e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 7, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.7896139621734619, "end": 2.0238590240478516}, {"type": "Wait", "start": 2.0240590572357178, "end": 2.024064302444458}, {"type": "Sampling", "start": 2.024064302444458, "end": 2.2949345111846924}], "unavailable": [], "error": null, "ttft": 0.009109515696763992, "latency": 0.2708704248070717, "wait": 3.3937394618988037e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 1, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.5434424877166748, "end": 2.2068676948547363}, {"type": "Wait", "start": 2.2070152759552, "end": 2.207019567489624}, {"type": "Sampling", "start": 2.207019567489624, "end": 2.491992950439453}], "unavailable": [], "error": null, "ttft": 0.010309826582670212, "latency": 0.28497352078557014, "wait": 2.9373914003372192e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 6, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.7305619716644287, "end": 2.3338699340820312}, {"type": "Wait", "start": 2.3340001106262207, "end": 2.3340036869049072}, {"type": "Sampling", "start": 2.3340036869049072, "end": 2.6241044998168945}], "unavailable": [], "error": null, "ttft": 0.009421180933713913, "latency": 0.2901009302586317, "wait": 2.3655593395233154e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 0, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.493638277053833, "end": 2.453540802001953}, {"type": "Wait", "start": 2.453673839569092, "end": 2.4536776542663574}, {"type": "Sampling", "start": 2.4536776542663574, "end": 2.7463796138763428}], "unavailable": [], "error": null, "ttft": 0.00943845510482788, "latency": 0.2927021309733391, "wait": 2.5331974029541016e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 15, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 1.2355091571807861, "end": 2.532076597213745}, {"type": "Wait", "start": 2.5322060585021973, "end": 2.532210111618042}, {"type": "Sampling", "start": 2.532210111618042, "end": 2.825199604034424}], "unavailable": [], "error": null, "ttft": 0.01050126925110817, "latency": 0.29298957996070385, "wait": 2.691522240638733e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 4, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.6688852310180664, "end": 2.68468976020813}, {"type": "Wait", "start": 2.684818744659424, "end": 2.6848227977752686}, {"type": "Sampling", "start": 2.6848227977752686, "end": 2.9802181720733643}], "unavailable": [], "error": null, "ttft": 0.008513811975717545, "latency": 0.29539561830461025, "wait": 2.5033950805664062e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 8, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.8507089614868164, "end": 2.796487808227539}, {"type": "Wait", "start": 2.7966156005859375, "end": 2.7966196537017822}, {"type": "Sampling", "start": 2.7966196537017822, "end": 3.0963919162750244}], "unavailable": [], "error": null, "ttft": 0.010565359145402908, "latency": 0.2997727748006582, "wait": 2.469867467880249e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 10, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.9733264446258545, "end": 2.892969846725464}, {"type": "Wait", "start": 2.893097162246704, "end": 2.893101453781128}, {"type": "Sampling", "start": 2.893101453781128, "end": 3.190464496612549}], "unavailable": [], "error": null, "ttft": 0.009552547708153725, "latency": 0.29736326448619366, "wait": 2.6281923055648804e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 14, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 1.186112880706787, "end": 2.9402027130126953}, {"type": "Wait", "start": 2.9403231143951416, "end": 2.9403269290924072}, {"type": "Sampling", "start": 2.9403269290924072, "end": 3.232405185699463}], "unavailable": [], "error": null, "ttft": 0.010689185932278633, "latency": 0.2920785825699568, "wait": 2.389773726463318e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 2, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.559398889541626, "end": 3.0663633346557617}, {"type": "Wait", "start": 3.0664987564086914, "end": 3.0665035247802734}, {"type": "Sampling", "start": 3.0665035247802734, "end": 3.3422274589538574}], "unavailable": [], "error": null, "ttft": 0.009570339694619179, "latency": 0.2757243160158396, "wait": 2.72504985332489e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 11, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 1.0300071239471436, "end": 3.4756195545196533}, {"type": "Wait", "start": 3.4759204387664795, "end": 3.4759273529052734}, {"type": "Sampling", "start": 3.4759273529052734, "end": 3.764045238494873}], "unavailable": [], "error": null, "ttft": 0.009295716881752014, "latency": 0.28811842016875744, "wait": 4.412606358528137e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 5, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.6734638214111328, "end": 3.6169631481170654}, {"type": "Wait", "start": 3.617141008377075, "end": 3.6171457767486572}, {"type": "Sampling", "start": 3.6171457767486572, "end": 3.9148671627044678}], "unavailable": [], "error": null, "ttft": 0.010584831237792969, "latency": 0.2977216597646475, "wait": 2.896413207054138e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 12, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 1.0820560455322266, "end": 3.647949695587158}, {"type": "Wait", "start": 3.6481051445007324, "end": 3.6481099128723145}, {"type": "Sampling", "start": 3.6481099128723145, "end": 3.9453907012939453}], "unavailable": [], "error": null, "ttft": 0.009623810648918152, "latency": 0.2972811069339514, "wait": 3.084540367126465e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 9, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 0.9144008159637451, "end": 3.696362018585205}, {"type": "Wait", "start": 3.696521520614624, "end": 3.696526527404785}, {"type": "Sampling", "start": 3.696526527404785, "end": 3.990777015686035}], "unavailable": [], "error": null, "ttft": 0.009548816829919815, "latency": 0.29425059258937836, "wait": 3.077089786529541e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 1, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 2.492143154144287, "end": 3.9231135845184326}, {"type": "Wait", "start": 3.9233319759368896, "end": 3.923337936401367}, {"type": "Sampling", "start": 3.923337936401367, "end": 4.229320049285889}], "unavailable": [], "error": null, "ttft": 0.010525334626436234, "latency": 0.3059822879731655, "wait": 4.386529326438904e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 13, "turn": 1, "worker": 0, "phases": [{"type": "Tool call", "start": 1.1360743045806885, "end": 3.982196092605591}, {"type": "Wait", "start": 3.9823734760284424, "end": 3.9823782444000244}, {"type": "Sampling", "start": 3.9823782444000244, "end": 4.284687042236328}], "unavailable": [], "error": null, "ttft": 0.01047845184803009, "latency": 0.30230920761823654, "wait": 3.073364496231079e-06, "context": 1408, "output": 128, "hits": {"device": 1152, "host": 0}}, {"conversation": 3, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 1.9837160110473633, "end": 4.002589225769043}, {"type": "Wait", "start": 4.002724647521973, "end": 4.002728462219238}, {"type": "Sampling", "start": 4.002728462219238, "end": 4.299551486968994}], "unavailable": [], "error": null, "ttft": 0.009602565318346024, "latency": 0.29682326689362526, "wait": 2.635642886161804e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 4, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 2.980367422103882, "end": 4.074457168579102}, {"type": "Wait", "start": 4.0745978355407715, "end": 4.074602127075195}, {"type": "Sampling", "start": 4.074602127075195, "end": 4.362077713012695}], "unavailable": [], "error": null, "ttft": 0.010556656867265701, "latency": 0.28747604973614216, "wait": 2.5462359189987183e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 8, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.096548318862915, "end": 4.39634108543396}, {"type": "Wait", "start": 4.396559238433838, "end": 4.396564245223999}, {"type": "Sampling", "start": 4.396564245223999, "end": 4.693021535873413}], "unavailable": [], "error": null, "ttft": 0.008434990420937538, "latency": 0.29645755141973495, "wait": 3.6153942346572876e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 6, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 2.624253511428833, "end": 4.442375659942627}, {"type": "Wait", "start": 4.442523717880249, "end": 4.442527770996094}, {"type": "Sampling", "start": 4.442527770996094, "end": 4.745588302612305}], "unavailable": [], "error": null, "ttft": 0.009462740272283554, "latency": 0.30306067131459713, "wait": 2.862885594367981e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 2, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.3424103260040283, "end": 4.516780614852905}, {"type": "Wait", "start": 4.516906499862671, "end": 4.516910552978516}, {"type": "Sampling", "start": 4.516910552978516, "end": 4.818949222564697}], "unavailable": [], "error": null, "ttft": 0.00933484174311161, "latency": 0.3020387962460518, "wait": 2.5480985641479492e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 10, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.190609931945801, "end": 4.674046277999878}, {"type": "Wait", "start": 4.674177408218384, "end": 4.6741814613342285}, {"type": "Sampling", "start": 4.6741814613342285, "end": 4.9652111530303955}], "unavailable": [], "error": null, "ttft": 0.009390205144882202, "latency": 0.29103006049990654, "wait": 2.4978071451187134e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 0, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 2.7465310096740723, "end": 4.6883649826049805}, {"type": "Wait", "start": 4.688481330871582, "end": 4.6884849071502686}, {"type": "Sampling", "start": 4.6884849071502686, "end": 4.975264310836792}], "unavailable": [], "error": null, "ttft": 0.011715764179825783, "latency": 0.28677947260439396, "wait": 2.2370368242263794e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 7, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 2.2950921058654785, "end": 5.000501394271851}, {"type": "Wait", "start": 5.000670433044434, "end": 5.000675439834595}, {"type": "Sampling", "start": 5.000675439834595, "end": 5.299559116363525}], "unavailable": [], "error": null, "ttft": 0.008940212428569794, "latency": 0.29888403974473476, "wait": 3.080815076828003e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 15, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 2.8253509998321533, "end": 5.017958164215088}, {"type": "Wait", "start": 5.018090009689331, "end": 5.018093824386597}, {"type": "Sampling", "start": 5.018093824386597, "end": 5.3186891078948975}], "unavailable": [], "error": null, "ttft": 0.014540664851665497, "latency": 0.30059547908604145, "wait": 2.4996697902679443e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 14, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.232542037963867, "end": 5.037238359451294}, {"type": "Wait", "start": 5.0373759269714355, "end": 5.037380218505859}, {"type": "Sampling", "start": 5.037380218505859, "end": 5.326746463775635}], "unavailable": [], "error": null, "ttft": 0.008957065641880035, "latency": 0.289366340264678, "wait": 2.693384885787964e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 11, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.7643332481384277, "end": 5.35605788230896}, {"type": "Wait", "start": 5.356300592422485, "end": 5.356307029724121}, {"type": "Sampling", "start": 5.356307029724121, "end": 5.629838943481445}], "unavailable": [], "error": null, "ttft": 0.009431114420294762, "latency": 0.27353199385106564, "wait": 4.326924681663513e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 13, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 4.2848381996154785, "end": 5.56213641166687}, {"type": "Wait", "start": 5.562389373779297, "end": 5.562395095825195}, {"type": "Sampling", "start": 5.562395095825195, "end": 5.843104600906372}], "unavailable": [], "error": null, "ttft": 0.00972212664783001, "latency": 0.28070945106446743, "wait": 4.433095455169678e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 4, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.36223292350769, "end": 5.709299564361572}, {"type": "Wait", "start": 5.709546089172363, "end": 5.709552764892578}, {"type": "Sampling", "start": 5.709552764892578, "end": 5.991166830062866}], "unavailable": [], "error": null, "ttft": 0.0096847303211689, "latency": 0.2816143110394478, "wait": 4.569068551063538e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 12, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.9455559253692627, "end": 5.913316011428833}, {"type": "Wait", "start": 5.913538694381714, "end": 5.913544654846191}, {"type": "Sampling", "start": 5.913544654846191, "end": 6.18620491027832}], "unavailable": [], "error": null, "ttft": 0.01314052939414978, "latency": 0.2726604472845793, "wait": 3.999099135398865e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 0, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.975396633148193, "end": 6.254530429840088}, {"type": "Wait", "start": 6.254758596420288, "end": 6.254764795303345}, {"type": "Sampling", "start": 6.254764795303345, "end": 6.5614471435546875}], "unavailable": [], "error": null, "ttft": 0.013960598036646843, "latency": 0.3066826518625021, "wait": 4.2691826820373535e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 5, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.91506290435791, "end": 6.255920648574829}, {"type": "Wait", "start": 6.2560670375823975, "end": 6.256070852279663}, {"type": "Sampling", "start": 6.256070852279663, "end": 6.561692953109741}], "unavailable": [], "error": null, "ttft": 0.0152379609644413, "latency": 0.3056221343576908, "wait": 2.810731530189514e-06, "context": 1792, "output": 128, "hits": {"device": 1536, "host": 0}}, {"conversation": 3, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.299689769744873, "end": 6.418328046798706}, {"type": "Wait", "start": 6.418498754501343, "end": 6.418503761291504}, {"type": "Sampling", "start": 6.418503761291504, "end": 6.7260496616363525}], "unavailable": [], "error": null, "ttft": 0.010870426893234253, "latency": 0.3075460400432348, "wait": 3.2279640436172485e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 9, "turn": 2, "worker": 0, "phases": [{"type": "Tool call", "start": 3.990938186645508, "end": 6.436413764953613}, {"type": "Wait", "start": 6.436546564102173, "end": 6.436550617218018}, {"type": "Sampling", "start": 6.436550617218018, "end": 6.738877534866333}], "unavailable": [], "error": null, "ttft": 0.01148298755288124, "latency": 0.3023270554840565, "wait": 2.5276094675064087e-06, "context": 1792, "output": 128, "hits": {"device": 1472, "host": 0}}, {"conversation": 2, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.8190953731536865, "end": 6.585532903671265}, {"type": "Wait", "start": 6.5856969356536865, "end": 6.5857014656066895}, {"type": "Sampling", "start": 6.5857014656066895, "end": 6.884555101394653}], "unavailable": [], "error": null, "ttft": 0.009872036054730415, "latency": 0.2988538295030594, "wait": 3.0118972063064575e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 15, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 5.318950176239014, "end": 6.769899606704712}, {"type": "Wait", "start": 6.770071029663086, "end": 6.77007532119751}, {"type": "Sampling", "start": 6.77007532119751, "end": 7.059720039367676}], "unavailable": [], "error": null, "ttft": 0.009330324828624725, "latency": 0.28964477963745594, "wait": 2.6766210794448853e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 1, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.229481220245361, "end": 6.813784837722778}, {"type": "Wait", "start": 6.81392502784729, "end": 6.813929796218872}, {"type": "Sampling", "start": 6.813929796218872, "end": 7.097803592681885}], "unavailable": [], "error": null, "ttft": 0.01174231804907322, "latency": 0.28387417644262314, "wait": 2.734363079071045e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 8, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.693176746368408, "end": 7.1730968952178955}, {"type": "Wait", "start": 7.173286437988281, "end": 7.1732916831970215}, {"type": "Sampling", "start": 7.1732916831970215, "end": 7.488706350326538}], "unavailable": [], "error": null, "ttft": 0.011716976761817932, "latency": 0.31541482359170914, "wait": 3.341585397720337e-06, "context": 2176, "output": 128, "hits": {"device": 1536, "host": 384}}, {"conversation": 12, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 6.18638801574707, "end": 7.3337883949279785}, {"type": "Wait", "start": 7.334012031555176, "end": 7.334017038345337}, {"type": "Sampling", "start": 7.334017038345337, "end": 7.673879861831665}], "unavailable": [], "error": null, "ttft": 0.01094181090593338, "latency": 0.33986297249794006, "wait": 3.1888484954833984e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 14, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 5.32693886756897, "end": 7.383277893066406}, {"type": "Wait", "start": 7.383409738540649, "end": 7.383413314819336}, {"type": "Sampling", "start": 7.383413314819336, "end": 7.718684196472168}], "unavailable": [], "error": null, "ttft": 0.012832356616854668, "latency": 0.3352710157632828, "wait": 2.4139881134033203e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 13, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 5.84330940246582, "end": 7.379914999008179}, {"type": "Wait", "start": 7.3800950050354, "end": 7.3801000118255615}, {"type": "Sampling", "start": 7.3801000118255615, "end": 7.718923330307007}], "unavailable": [], "error": null, "ttft": 0.013581398874521255, "latency": 0.33882346004247665, "wait": 3.2391399145126343e-06, "context": 2176, "output": 128, "hits": {"device": 1920, "host": 0}}, {"conversation": 6, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.7457334995269775, "end": 7.437926769256592}, {"type": "Wait", "start": 7.438297271728516, "end": 7.438302040100098}, {"type": "Sampling", "start": 7.438302040100098, "end": 7.7633867263793945}], "unavailable": [], "error": null, "ttft": 0.016017863526940346, "latency": 0.3250847104936838, "wait": 2.9206275939941406e-06, "context": 2176, "output": 128, "hits": {"device": 0, "host": 1920}}, {"conversation": 10, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 4.965361595153809, "end": 7.454326152801514}, {"type": "Wait", "start": 7.454453229904175, "end": 7.45445704460144}, {"type": "Sampling", "start": 7.45445704460144, "end": 7.7673399448394775}], "unavailable": [], "error": null, "ttft": 0.01296139508485794, "latency": 0.31288331374526024, "wait": 2.507120370864868e-06, "context": 2176, "output": 128, "hits": {"device": 0, "host": 1920}}, {"conversation": 7, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 5.299721002578735, "end": 7.875670909881592}, {"type": "Wait", "start": 7.8759424686431885, "end": 7.8759496212005615}, {"type": "Sampling", "start": 7.8759496212005615, "end": 8.15365195274353}], "unavailable": [], "error": null, "ttft": 0.013336766511201859, "latency": 0.27770272456109524, "wait": 4.533678293228149e-06, "context": 2176, "output": 128, "hits": {"device": 0, "host": 1920}}, {"conversation": 2, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 6.884725570678711, "end": 8.09852910041809}, {"type": "Wait", "start": 8.09886384010315, "end": 8.098870277404785}, {"type": "Sampling", "start": 8.098870277404785, "end": 8.39191460609436}], "unavailable": [], "error": null, "ttft": 0.011355796828866005, "latency": 0.29304435290396214, "wait": 4.414469003677368e-06, "context": 2560, "output": 128, "hits": {"device": 2304, "host": 0}}, {"conversation": 11, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 5.63004207611084, "end": 8.188682317733765}, {"type": "Wait", "start": 8.188979148864746, "end": 8.188987255096436}, {"type": "Sampling", "start": 8.188987255096436, "end": 8.487061023712158}], "unavailable": [], "error": null, "ttft": 0.015077926218509674, "latency": 0.29807411693036556, "wait": 5.301088094711304e-06, "context": 2176, "output": 128, "hits": {"device": 0, "host": 1920}}, {"conversation": 4, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 5.9913489818573, "end": 8.40171217918396}, {"type": "Wait", "start": 8.401970863342285, "end": 8.401977777481079}, {"type": "Sampling", "start": 8.401977777481079, "end": 8.737229108810425}], "unavailable": [], "error": null, "ttft": 0.015436733141541481, "latency": 0.335251284763217, "wait": 4.71062958240509e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 1, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.097954511642456, "end": 8.485414266586304}, {"type": "Wait", "start": 8.48558783531189, "end": 8.48559284210205}, {"type": "Sampling", "start": 8.48559284210205, "end": 8.816871881484985}], "unavailable": [], "error": null, "ttft": 0.010656287893652916, "latency": 0.3312792629003525, "wait": 3.337860107421875e-06, "context": 2560, "output": 128, "hits": {"device": 2304, "host": 0}}, {"conversation": 15, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.059896230697632, "end": 8.55478811264038}, {"type": "Wait", "start": 8.554967164993286, "end": 8.554971933364868}, {"type": "Sampling", "start": 8.554971933364868, "end": 8.890731811523438}], "unavailable": [], "error": null, "ttft": 0.011641595512628555, "latency": 0.33576006442308426, "wait": 3.162771463394165e-06, "context": 2560, "output": 128, "hits": {"device": 2304, "host": 0}}, {"conversation": 5, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 6.561835765838623, "end": 8.567686796188354}, {"type": "Wait", "start": 8.567830562591553, "end": 8.567834377288818}, {"type": "Sampling", "start": 8.567834377288818, "end": 8.898056507110596}], "unavailable": [], "error": null, "ttft": 0.014988929033279419, "latency": 0.3302222564816475, "wait": 2.436339855194092e-06, "context": 2176, "output": 128, "hits": {"device": 0, "host": 1920}}, {"conversation": 0, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 6.561631679534912, "end": 8.643930673599243}, {"type": "Wait", "start": 8.64406943321228, "end": 8.644073724746704}, {"type": "Sampling", "start": 8.644073724746704, "end": 8.960494756698608}], "unavailable": [], "error": null, "ttft": 0.0169011689722538, "latency": 0.3164215609431267, "wait": 2.7213245630264282e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 14, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.718865633010864, "end": 8.839548826217651}, {"type": "Wait", "start": 8.839722156524658, "end": 8.83972716331482}, {"type": "Sampling", "start": 8.83972716331482, "end": 9.128952741622925}], "unavailable": [], "error": null, "ttft": 0.01078156940639019, "latency": 0.28922591730952263, "wait": 3.032386302947998e-06, "context": 2560, "output": 128, "hits": {"device": 2304, "host": 0}}, {"conversation": 9, "turn": 3, "worker": 0, "phases": [{"type": "Tool call", "start": 6.739025831222534, "end": 9.094890117645264}, {"type": "Wait", "start": 9.095057249069214, "end": 9.095061779022217}, {"type": "Sampling", "start": 9.095061779022217, "end": 9.365533351898193}], "unavailable": [], "error": null, "ttft": 0.013190673664212227, "latency": 0.2704719416797161, "wait": 2.8759241104125977e-06, "context": 2176, "output": 128, "hits": {"device": 0, "host": 1920}}, {"conversation": 3, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 6.726220369338989, "end": 9.54897427558899}, {"type": "Wait", "start": 9.549185752868652, "end": 9.549191236495972}, {"type": "Sampling", "start": 9.549191236495972, "end": 9.835787773132324}], "unavailable": [], "error": null, "ttft": 0.014155853539705276, "latency": 0.28659676760435104, "wait": 3.4775584936141968e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 12, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.6740686893463135, "end": 9.735928058624268}, {"type": "Wait", "start": 9.736137390136719, "end": 9.736143112182617}, {"type": "Sampling", "start": 9.736143112182617, "end": 10.050824165344238}], "unavailable": [], "error": null, "ttft": 0.015174172818660736, "latency": 0.31468138098716736, "wait": 3.976747393608093e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 13, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.719055891036987, "end": 9.909440040588379}, {"type": "Wait", "start": 9.909673690795898, "end": 9.909680128097534}, {"type": "Sampling", "start": 9.909680128097534, "end": 10.243220329284668}], "unavailable": [], "error": null, "ttft": 0.014488257467746735, "latency": 0.33354030549526215, "wait": 4.215165972709656e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 7, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 8.15390944480896, "end": 9.926849842071533}, {"type": "Wait", "start": 9.927001953125, "end": 9.927006244659424}, {"type": "Sampling", "start": 9.927006244659424, "end": 10.252426624298096}], "unavailable": [], "error": null, "ttft": 0.014392567798495293, "latency": 0.32542043179273605, "wait": 2.9318034648895264e-06, "context": 2560, "output": 128, "hits": {"device": 1536, "host": 768}}, {"conversation": 1, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 8.817041873931885, "end": 9.997572898864746}, {"type": "Wait", "start": 9.997740507125854, "end": 9.997745275497437}, {"type": "Sampling", "start": 9.997745275497437, "end": 10.337412595748901}], "unavailable": [], "error": null, "ttft": 0.010319314897060394, "latency": 0.3396676108241081, "wait": 3.0081719160079956e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 6, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.763566970825195, "end": 10.115787267684937}, {"type": "Wait", "start": 10.11598253250122, "end": 10.115987539291382}, {"type": "Sampling", "start": 10.115987539291382, "end": 10.449294567108154}], "unavailable": [], "error": null, "ttft": 0.0172351635992527, "latency": 0.33330730907619, "wait": 3.3043324947357178e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 10, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.767483949661255, "end": 10.255590915679932}, {"type": "Wait", "start": 10.255775213241577, "end": 10.255780458450317}, {"type": "Sampling", "start": 10.255780458450317, "end": 10.568035125732422}], "unavailable": [], "error": null, "ttft": 0.016215991228818893, "latency": 0.3122549820691347, "wait": 3.589317202568054e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 8, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 7.488901615142822, "end": 10.270863771438599}, {"type": "Wait", "start": 10.271000385284424, "end": 10.271004676818848}, {"type": "Sampling", "start": 10.271004676818848, "end": 10.57212781906128}], "unavailable": [], "error": null, "ttft": 0.016514992341399193, "latency": 0.30112334340810776, "wait": 2.682209014892578e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 11, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 8.487237215042114, "end": 10.573362350463867}, {"type": "Wait", "start": 10.573557615280151, "end": 10.573562383651733}, {"type": "Sampling", "start": 10.573562383651733, "end": 10.846673250198364}], "unavailable": [], "error": null, "ttft": 0.015500007197260857, "latency": 0.2731112241744995, "wait": 3.291293978691101e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 4, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 8.73740553855896, "end": 11.12608528137207}, {"type": "Wait", "start": 11.126333236694336, "end": 11.12633991241455}, {"type": "Sampling", "start": 11.12633991241455, "end": 11.423480749130249}], "unavailable": [], "error": null, "ttft": 0.015688234940171242, "latency": 0.29714119993150234, "wait": 4.412606358528137e-06, "context": 2944, "output": 128, "hits": {"device": 0, "host": 2688}}, {"conversation": 2, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 8.392130136489868, "end": 11.224003791809082}, {"type": "Wait", "start": 11.224167346954346, "end": 11.224171876907349}, {"type": "Sampling", "start": 11.224171876907349, "end": 11.537472486495972}], "unavailable": [], "error": null, "ttft": 0.0162140391767025, "latency": 0.3133009597659111, "wait": 2.907589077949524e-06, "context": 2944, "output": 128, "hits": {"device": 0, "host": 2688}}, {"conversation": 5, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 8.898199796676636, "end": 11.446574211120605}, {"type": "Wait", "start": 11.446738243103027, "end": 11.446742534637451}, {"type": "Sampling", "start": 11.446742534637451, "end": 11.77100920677185}], "unavailable": [], "error": null, "ttft": 0.015283143147826195, "latency": 0.3242670148611069, "wait": 2.6598572731018066e-06, "context": 2560, "output": 128, "hits": {"device": 0, "host": 2304}}, {"conversation": 15, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 8.890904664993286, "end": 11.487189054489136}, {"type": "Wait", "start": 11.487324476242065, "end": 11.487328290939331}, {"type": "Sampling", "start": 11.487328290939331, "end": 11.803549766540527}], "unavailable": [], "error": null, "ttft": 0.015124579891562462, "latency": 0.3162217251956463, "wait": 2.4847686290740967e-06, "context": 2944, "output": 128, "hits": {"device": 0, "host": 2688}}, {"conversation": 10, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 10.568205833435059, "end": 11.732983112335205}, {"type": "Wait", "start": 11.733113765716553, "end": 11.733117580413818}, {"type": "Sampling", "start": 11.733117580413818, "end": 12.060618162155151}], "unavailable": [], "error": null, "ttft": 0.02088898979127407, "latency": 0.3275011572986841, "wait": 2.255663275718689e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 14, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 9.12931227684021, "end": 11.72955060005188}, {"type": "Wait", "start": 11.729727506637573, "end": 11.729737520217896}, {"type": "Sampling", "start": 11.729737520217896, "end": 12.060993909835815}], "unavailable": [], "error": null, "ttft": 0.02073163166642189, "latency": 0.3312564827501774, "wait": 8.471310138702393e-06, "context": 2944, "output": 128, "hits": {"device": 0, "host": 2688}}, {"conversation": 0, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 8.960659742355347, "end": 11.884847640991211}, {"type": "Wait", "start": 11.884989976882935, "end": 11.884994268417358}, {"type": "Sampling", "start": 11.884994268417358, "end": 12.20333456993103}], "unavailable": [], "error": null, "ttft": 0.015192648395895958, "latency": 0.31834045238792896, "wait": 2.7175992727279663e-06, "context": 2944, "output": 128, "hits": {"device": 0, "host": 2688}}, {"conversation": 8, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 10.572265148162842, "end": 12.004753112792969}, {"type": "Wait", "start": 12.004897832870483, "end": 12.004902124404907}, {"type": "Sampling", "start": 12.004902124404907, "end": 12.314389944076538}], "unavailable": [], "error": null, "ttft": 0.011709854006767273, "latency": 0.30948800779879093, "wait": 2.769753336906433e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 9, "turn": 4, "worker": 0, "phases": [{"type": "Tool call", "start": 9.365699529647827, "end": 12.15895390510559}, {"type": "Wait", "start": 12.159094095230103, "end": 12.159098148345947}, {"type": "Sampling", "start": 12.159098148345947, "end": 12.467447996139526}], "unavailable": [], "error": null, "ttft": 0.013849487528204918, "latency": 0.3083501011133194, "wait": 2.6635825634002686e-06, "context": 2560, "output": 128, "hits": {"device": 1472, "host": 832}}, {"conversation": 13, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 10.243401288986206, "end": 12.27817440032959}, {"type": "Wait", "start": 12.278310537338257, "end": 12.278314352035522}, {"type": "Sampling", "start": 12.278314352035522, "end": 12.584549903869629}], "unavailable": [], "error": null, "ttft": 0.010386019945144653, "latency": 0.30623576790094376, "wait": 2.436339855194092e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 6, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 10.449465990066528, "end": 12.377296686172485}, {"type": "Wait", "start": 12.377432823181152, "end": 12.377437114715576}, {"type": "Sampling", "start": 12.377437114715576, "end": 12.693176507949829}], "unavailable": [], "error": null, "ttft": 0.011140679940581322, "latency": 0.315739531069994, "wait": 2.7641654014587402e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 11, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 10.846888303756714, "end": 12.519557237625122}, {"type": "Wait", "start": 12.51968789100647, "end": 12.519691944122314}, {"type": "Sampling", "start": 12.519691944122314, "end": 12.834664583206177}], "unavailable": [], "error": null, "ttft": 0.011143838986754417, "latency": 0.3149725403636694, "wait": 2.6654452085494995e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 12, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 10.051002502441406, "end": 12.594172716140747}, {"type": "Wait", "start": 12.594300985336304, "end": 12.594305038452148}, {"type": "Sampling", "start": 12.594305038452148, "end": 12.900003671646118}], "unavailable": [], "error": null, "ttft": 0.009884817525744438, "latency": 0.3056986276060343, "wait": 2.6207417249679565e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 3, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 9.835996627807617, "end": 12.655400276184082}, {"type": "Wait", "start": 12.655523777008057, "end": 12.65552806854248}, {"type": "Sampling", "start": 12.65552806854248, "end": 12.950896739959717}], "unavailable": [], "error": null, "ttft": 0.011128008365631104, "latency": 0.2953687161207199, "wait": 2.7194619178771973e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 5, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 11.771179914474487, "end": 12.980971336364746}, {"type": "Wait", "start": 12.981120824813843, "end": 12.981125354766846}, {"type": "Sampling", "start": 12.981125354766846, "end": 13.25672698020935}], "unavailable": [], "error": null, "ttft": 0.009621776640415192, "latency": 0.2756019327789545, "wait": 2.8703361749649048e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 7, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 10.252567768096924, "end": 13.211309909820557}, {"type": "Wait", "start": 13.211462497711182, "end": 13.211467266082764}, {"type": "Sampling", "start": 13.211467266082764, "end": 13.48244857788086}], "unavailable": [], "error": null, "ttft": 0.010261384770274162, "latency": 0.2709816861897707, "wait": 3.0547380447387695e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}, {"conversation": 9, "turn": 5, "worker": 0, "phases": [{"type": "Tool call", "start": 12.467596530914307, "end": 14.693595170974731}, {"type": "Wait", "start": 14.693869352340698, "end": 14.693875789642334}, {"type": "Sampling", "start": 14.693875789642334, "end": 14.963011264801025}], "unavailable": [], "error": null, "ttft": 0.011259712278842926, "latency": 0.2691359855234623, "wait": 4.123896360397339e-06, "context": 2944, "output": 128, "hits": {"device": 2688, "host": 0}}], "exporters": {"Recorded exporter 1": [{"title": "QPS", "unit": "req/s", "source": "Successful client completions / 2-second window", "series": [{"name": "requests", "points": [[1.0, 8.5], [3.0, 7.0], [5.0, 7.5], [7.0, 7.0], [9.0, 5.5], [11.0, 6.0], [13.0, 6.0], [14.4823716878891, 1.0365450803882041]]}]}, {"title": "Running And Queued Requests", "unit": "requests", "source": "Server num_running_reqs / num_queue_reqs gauges", "series": [{"name": "running", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 6.0], [2.0128517150878906, 0.0], [3.013887882232666, 4.0], [4.0141050815582275, 2.0], [5.014807939529419, 0.0], [6.015185594558716, 2.0], [7.015623092651367, 2.0], [8.016020774841309, 1.0], [9.01701283454895, 2.0], [10.017662525177002, 4.0], [11.018176555633545, 0.0], [12.019459247589111, 3.0], [13.020312547683716, 0.0], [14.021878004074097, 0.0]]}, {"name": "queued", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 0.0], [2.0128517150878906, 0.0], [3.013887882232666, 0.0], [4.0141050815582275, 0.0], [5.014807939529419, 0.0], [6.015185594558716, 0.0], [7.015623092651367, 0.0], [8.016020774841309, 0.0], [9.01701283454895, 0.0], [10.017662525177002, 0.0], [11.018176555633545, 0.0], [12.019459247589111, 0.0], [13.020312547683716, 0.0], [14.021878004074097, 0.0]]}]}, {"title": "Input Length", "unit": "tokens", "source": "Client context, grouped by completion/failure time", "series": [{"name": "avg", "points": [[1.0, 1046.5882352941176], [3.0, 1408], [5.0, 1792], [7.0, 2093.714285714286], [9.0, 2420.3636363636365], [11.0, 2688], [13.0, 2912], [14.4823716878891, 2944]]}, {"name": "p50", "points": [[1.0, 1024], [3.0, 1408], [5.0, 1792], [7.0, 2176], [9.0, 2560], [11.0, 2560], [13.0, 2944], [14.4823716878891, 2944]]}, {"name": "p90", "points": [[1.0, 1024], [3.0, 1408], [5.0, 1792], [7.0, 2176], [9.0, 2560], [11.0, 2944], [13.0, 2944], [14.4823716878891, 2944]]}, {"name": "p99", "points": [[1.0, 1408], [3.0, 1408], [5.0, 2176], [7.0, 2176], [9.0, 2560], [11.0, 2944], [13.0, 2944], [14.4823716878891, 2944]]}]}, {"title": "Output Length", "unit": "tokens", "source": "Observed output token counts; includes partial requests", "series": [{"name": "avg", "points": [[1.0, 128], [3.0, 128], [5.0, 128], [7.0, 128], [9.0, 128], [11.0, 128], [13.0, 128], [14.4823716878891, 128]]}, {"name": "p50", "points": [[1.0, 128], [3.0, 128], [5.0, 128], [7.0, 128], [9.0, 128], [11.0, 128], [13.0, 128], [14.4823716878891, 128]]}, {"name": "p90", "points": [[1.0, 128], [3.0, 128], [5.0, 128], [7.0, 128], [9.0, 128], [11.0, 128], [13.0, 128], [14.4823716878891, 128]]}, {"name": "p99", "points": [[1.0, 128], [3.0, 128], [5.0, 128], [7.0, 128], [9.0, 128], [11.0, 128], [13.0, 128], [14.4823716878891, 128]]}]}, {"title": "TTFT", "unit": "ms", "source": "Client submit to first output; includes partial requests with measured TTFT", "series": [{"name": "avg", "points": [[1.0, 18.63374111845213], [3.0, 9.766047687402793], [5.0, 10.051830982168516], [7.0, 12.406355967479092], [9.0, 13.4112091565674], [11.0, 15.1792053754131], [13.0, 12.994928130259117], [14.4823716878891, 11.259712278842926]]}, {"name": "p50", "points": [[1.0, 10.926607996225357], [3.0, 9.552547708153725], [5.0, 9.602565318346024], [7.0, 11.74231804907322], [9.0, 13.336766511201859], [11.0, 15.283143147826195], [13.0, 11.140679940581322], [14.4823716878891, 11.259712278842926]]}, {"name": "p90", "points": [[1.0, 52.02278681099415], [3.0, 10.584831237792969], [5.0, 11.715764179825783], [7.0, 15.2379609644413], [9.0, 15.436733141541481], [11.0, 16.514992341399193], [13.0, 20.73163166642189], [14.4823716878891, 11.259712278842926]]}, {"name": "p99", "points": [[1.0, 52.03273706138134], [3.0, 10.689185932278633], [5.0, 14.540664851665497], [7.0, 16.017863526940346], [9.0, 16.9011689722538], [11.0, 17.2351635992527], [13.0, 20.88898979127407], [14.4823716878891, 11.259712278842926]]}]}, {"title": "ITL", "unit": "ms", "source": "Client stream intervals / received token increments; not kernel timing", "series": [{"name": "avg", "points": [[1.0, 2.60439445922473], [3.0, 2.2124485377862744], [5.0, 2.2258075682419025], [7.0, 2.3339403759048274], [9.0, 2.317052915850642], [11.0, 2.3656771047136784], [13.0, 2.302392619279362], [14.4823716878891, 2.0302754100852125]]}, {"name": "p50", "points": [[1.0, 2.270881086587906], [3.0, 2.1608080714941025], [5.0, 2.2068098187446594], [7.0, 2.2449791431427], [9.0, 2.1612271666526794], [11.0, 2.234548330307007], [13.0, 2.2102855145931244], [14.4823716878891, 2.0276904106140137]]}, {"name": "p90", "points": [[1.0, 3.3986754715442657], [3.0, 2.231050282716751], [5.0, 2.2617485374212265], [7.0, 2.4506356567144394], [9.0, 2.453198656439781], [11.0, 2.375466749072075], [13.0, 2.3800525814294815], [14.4823716878891, 2.0544305443763733]]}, {"name": "p99", "points": [[1.0, 6.206966936588287], [3.0, 5.3925905376672745], [5.0, 5.1477160304784775], [7.0, 5.817590281367302], [9.0, 8.49938951432705], [11.0, 10.608388110995293], [13.0, 5.528386682271957], [14.4823716878891, 2.296188846230507]]}]}, {"title": "Prompt / Input Throughput", "unit": "tokens/s", "source": "Server counter deltas / scrape interval; cached sums all tiers", "series": [{"name": "prompt", "points": [[1.0117278099060059, null], [2.0128517150878906, 6520.671383642556], [3.013887882232666, 8439.255520703084], [4.0141050815582275, 11261.553998066845], [5.014807939529419, 15732.94197632165], [6.015185594558716, 11131.796021247468], [7.015623092651367, 11898.794300188816], [8.016020774841309, 17401.07990043785], [9.01701283454895, 19308.844473396824], [10.017662525177002, 7291.262934804597], [11.018176555633545, 20853.280778560977], [12.019459247589111, 11377.406292473433], [13.020312547683716, 29031.227650699173], [14.021878004074097, 5878.796999669116]]}, {"name": "cached", "points": [[1.0117278099060059, null], [2.0128517150878906, null], [3.013887882232666, 6904.845426029795], [4.0141050815582275, 9213.998725691055], [5.014807939529419, 13430.560223689214], [6.015185594558716, 9596.375880385749], [7.015623092651367, 10299.493991023654], [8.016020774841309, null], [9.01701283454895, 17262.87419807001], [10.017662525177002, 6523.761573246218], [11.018176555633545, 18806.332972076463], [12.019459247589111, 10354.718086408406], [13.020312547683716, 26473.410236540658], [14.021878004074097, 5367.597260567454]]}]}, {"title": "Output Throughput", "unit": "tokens/s", "source": "Server generation counter deltas / scrape interval", "series": [{"name": "total", "points": [[1.0117278099060059, null], [2.0128517150878906, 767.1378098403007], [3.013887882232666, 767.2050473366439], [4.0141050815582275, 1023.777636187895], [5.014807939529419, 1151.1908763162182], [6.015185594558716, 767.7100704308599], [7.015623092651367, 767.6641483992785], [8.016020774841309, 1023.5929353198734], [9.01701283454895, 1022.985137663408], [10.017662525177002, 383.7506807791893], [11.018176555633545, 1023.4739032422566], [12.019459247589111, 511.3441030325139], [13.020312547683716, 1278.9087070792586], [14.021878004074097, 255.59986955083113]]}]}, {"title": "Cache Hit Rate", "unit": "%", "source": "Counter deltas from prefill_effective_tokens_total; each tier / all prompt tokens. Total includes storage hits.", "series": [{"name": "L1 GPU", "points": [[1.0117278099060059, 0.0], [2.0128517150878906, 81.81818181818181], [3.013887882232666, 81.81818181818181], [4.0141050815582275, 82.97872340425532], [5.014807939529419, 85.71428571428571], [6.015185594558716, 86.20689655172414], [7.015623092651367, 87.16814159292035], [8.016020774841309, 47.89915966386555], [9.01701283454895, 46.753246753246756], [10.017662525177002, 27.5], [11.018176555633545, 0.0], [12.019459247589111, 23.204419889502763], [13.020312547683716, 87.0253164556962], [14.021878004074097, 91.30434782608695]], "color": 0}, {"name": "L2 CPU", "points": [[1.0117278099060059, 0.0], [2.0128517150878906, 0.0], [3.013887882232666, 0.0], [4.0141050815582275, 0.0], [5.014807939529419, 0.0], [6.015185594558716, 0.0], [7.015623092651367, 0.0], [8.016020774841309, 40.33613445378151], [9.01701283454895, 42.857142857142854], [10.017662525177002, 62.5], [11.018176555633545, 90.0], [12.019459247589111, 67.95580110497238], [13.020312547683716, 4.113924050632911], [14.021878004074097, 0.0]], "color": 1}, {"name": "Total", "points": [[1.0117278099060059, 0.0], [2.0128517150878906, 81.81818181818181], [3.013887882232666, 81.81818181818181], [4.0141050815582275, 82.97872340425532], [5.014807939529419, 85.71428571428571], [6.015185594558716, 86.20689655172414], [7.015623092651367, 87.16814159292035], [8.016020774841309, 88.23529411764706], [9.01701283454895, 89.6103896103896], [10.017662525177002, 90.0], [11.018176555633545, 90.0], [12.019459247589111, 91.16022099447514], [13.020312547683716, 91.13924050632912], [14.021878004074097, 91.30434782608695]], "color": 2, "dashed": true}]}, {"title": "E2E Request Latency", "unit": "ms", "source": "Client submit to completed stream", "series": [{"name": "avg", "points": [[1.0, 349.41301637274375], [3.0, 290.66735160137927], [5.0, 293.1105986237526], [7.0, 309.6108150535396], [9.0, 305.8227500454946], [11.0, 315.33645729844767], [13.0, 306.6279169482489], [14.4823716878891, 269.1359855234623]]}, {"name": "p50", "points": [[1.0, 337.88326010107994], [3.0, 292.7021309733391], [5.0, 296.45755141973495], [7.0, 306.6826518625021], [9.0, 298.07411693036556], [11.0, 314.68138098716736], [13.0, 308.3501011133194], [14.4823716878891, 269.1359855234623]]}, {"name": "p90", "points": [[1.0, 465.82987159490585], [3.0, 297.7216597646475], [5.0, 303.06067131459713], [7.0, 338.82346004247665], [9.0, 335.251284763217], [11.0, 333.54030549526215], [13.0, 327.5011572986841], [14.4823716878891, 269.1359855234623]]}, {"name": "p99", "points": [[1.0, 469.2601412534714], [3.0, 299.7727748006582], [5.0, 305.9822879731655], [7.0, 339.86297249794006], [9.0, 335.76006442308426], [11.0, 339.6676108241081], [13.0, 331.2564827501774], [14.4823716878891, 269.1359855234623]]}]}, {"title": "KV Usage", "unit": "%", "source": "L1: (active + evictable) / GPU capacity. L2: host used / host capacity.", "series": [{"name": "L1 GPU", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 55.6640625], [2.0128517150878906, 57.421875], [3.013887882232666, 67.578125], [4.0141050815582275, 76.5625], [5.014807939529419, 85.15625], [6.015185594558716, 92.1875], [7.015623092651367, 99.609375], [8.016020774841309, 99.4140625], [9.01701283454895, 98.2421875], [10.017662525177002, 99.0234375], [11.018176555633545, 99.609375], [12.019459247589111, 99.0234375], [13.020312547683716, 99.4140625], [14.021878004074097, 99.609375]], "color": 0}, {"name": "L2 CPU", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 33.65853658536585], [2.0128517150878906, 35.609756097560975], [3.013887882232666, 41.46341463414634], [4.0141050815582275, 47.4390243902439], [5.014807939529419, 53.048780487804876], [6.015185594558716, 57.19512195121951], [7.015623092651367, 62.4390243902439], [8.016020774841309, 67.8048780487805], [9.01701283454895, 73.41463414634147], [10.017662525177002, 77.3170731707317], [11.018176555633545, 81.21951219512195], [12.019459247589111, 86.09756097560975], [13.020312547683716, 91.95121951219512], [14.021878004074097, 92.6829268292683]], "color": 1}]}, {"title": "KV Tokens", "unit": "tokens", "source": "L1 occupied = active + evictable GPU tokens. L2 occupied = host used tokens. Dashed lines show capacity.", "series": [{"name": "L1 occupied", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 18240.0], [2.0128517150878906, 18816.0], [3.013887882232666, 22144.0], [4.0141050815582275, 25088.0], [5.014807939529419, 27904.0], [6.015185594558716, 30208.0], [7.015623092651367, 32640.0], [8.016020774841309, 32576.0], [9.01701283454895, 32192.0], [10.017662525177002, 32448.0], [11.018176555633545, 32640.0], [12.019459247589111, 32448.0], [13.020312547683716, 32576.0], [14.021878004074097, 32640.0]], "color": 0}, {"name": "L1 capacity", "points": [[0.010952949523925781, 32768.0], [1.0117278099060059, 32768.0], [2.0128517150878906, 32768.0], [3.013887882232666, 32768.0], [4.0141050815582275, 32768.0], [5.014807939529419, 32768.0], [6.015185594558716, 32768.0], [7.015623092651367, 32768.0], [8.016020774841309, 32768.0], [9.01701283454895, 32768.0], [10.017662525177002, 32768.0], [11.018176555633545, 32768.0], [12.019459247589111, 32768.0], [13.020312547683716, 32768.0], [14.021878004074097, 32768.0]], "color": 0, "dashed": true}, {"name": "L2 occupied", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 17664.0], [2.0128517150878906, 18688.0], [3.013887882232666, 21760.0], [4.0141050815582275, 24896.0], [5.014807939529419, 27840.0], [6.015185594558716, 30016.0], [7.015623092651367, 32768.0], [8.016020774841309, 35584.0], [9.01701283454895, 38528.0], [10.017662525177002, 40576.0], [11.018176555633545, 42624.0], [12.019459247589111, 45184.0], [13.020312547683716, 48256.0], [14.021878004074097, 48640.0]], "color": 1}, {"name": "L2 capacity", "points": [[0.010952949523925781, 52480.0], [1.0117278099060059, 52480.0], [2.0128517150878906, 52480.0], [3.013887882232666, 52480.0], [4.0141050815582275, 52480.0], [5.014807939529419, 52480.0], [6.015185594558716, 52480.0], [7.015623092651367, 52480.0], [8.016020774841309, 52480.0], [9.01701283454895, 52480.0], [10.017662525177002, 52480.0], [11.018176555633545, 52480.0], [12.019459247589111, 52480.0], [13.020312547683716, 52480.0], [14.021878004074097, 52480.0]], "color": 1, "dashed": true}]}, {"title": "Mamba Usage", "unit": "%", "source": "Maximum server mamba_usage across reported ranks", "series": [{"name": "usage", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 0.0], [2.0128517150878906, 0.0], [3.013887882232666, 0.0], [4.0141050815582275, 0.0], [5.014807939529419, 0.0], [6.015185594558716, 0.0], [7.015623092651367, 0.0], [8.016020774841309, 0.0], [9.01701283454895, 0.0], [10.017662525177002, 0.0], [11.018176555633545, 0.0], [12.019459247589111, 0.0], [13.020312547683716, 0.0], [14.021878004074097, 0.0]]}]}, {"title": "Mamba Tokens", "unit": "tokens", "source": "Server Mamba token gauges", "series": [{"name": "used", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 0.0], [2.0128517150878906, 0.0], [3.013887882232666, 0.0], [4.0141050815582275, 0.0], [5.014807939529419, 0.0], [6.015185594558716, 0.0], [7.015623092651367, 0.0], [8.016020774841309, 0.0], [9.01701283454895, 0.0], [10.017662525177002, 0.0], [11.018176555633545, 0.0], [12.019459247589111, 0.0], [13.020312547683716, 0.0], [14.021878004074097, 0.0]]}, {"name": "available", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 0.0], [2.0128517150878906, 0.0], [3.013887882232666, 0.0], [4.0141050815582275, 0.0], [5.014807939529419, 0.0], [6.015185594558716, 0.0], [7.015623092651367, 0.0], [8.016020774841309, 0.0], [9.01701283454895, 0.0], [10.017662525177002, 0.0], [11.018176555633545, 0.0], [12.019459247589111, 0.0], [13.020312547683716, 0.0], [14.021878004074097, 0.0]]}, {"name": "evictable", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 0.0], [2.0128517150878906, 0.0], [3.013887882232666, 0.0], [4.0141050815582275, 0.0], [5.014807939529419, 0.0], [6.015185594558716, 0.0], [7.015623092651367, 0.0], [8.016020774841309, 0.0], [9.01701283454895, 0.0], [10.017662525177002, 0.0], [11.018176555633545, 0.0], [12.019459247589111, 0.0], [13.020312547683716, 0.0], [14.021878004074097, 0.0]]}]}, {"title": "Spec Acceptance Length", "unit": "tokens", "source": "Unweighted mean spec_accept_length across reported ranks", "series": [{"name": "accepted", "points": [[0.010952949523925781, 0.0], [1.0117278099060059, 0.0], [2.0128517150878906, 0.0], [3.013887882232666, 0.0], [4.0141050815582275, 0.0], [5.014807939529419, 0.0], [6.015185594558716, 0.0], [7.015623092651367, 0.0], [8.016020774841309, 0.0], [9.01701283454895, 0.0], [10.017662525177002, 0.0], [11.018176555633545, 0.0], [12.019459247589111, 0.0], [13.020312547683716, 0.0], [14.021878004074097, 0.0]]}]}]}};
+const $ = (s) => document.querySelector(s),
+  NS = "http://www.w3.org/2000/svg",
+  COLORS = ["var(--sampling)", "var(--tool)", "var(--s3)", "var(--s4)"];
+let start = 0,
+  span = DATA.summary.duration,
+  selected = DATA.rows[0],
+  drag = null;
+const total = span;
+const lanes = [
+  ...new Map(
+    DATA.rows.map((r) => [
+      JSON.stringify([r.worker, r.conversation]),
+      { worker: r.worker, conversation: r.conversation },
+    ]),
+  ).values(),
+].sort(
+  (a, b) =>
+    (a.worker ?? Infinity) - (b.worker ?? Infinity) ||
+    String(a.conversation).localeCompare(String(b.conversation), undefined, {
+      numeric: true,
+    }),
+);
+
+let metrics = Object.values(DATA.exporters)[0];
+$("#subtitle").textContent =
+  `${DATA.summary.model} · ${DATA.summary.requests} requests · ${DATA.summary.conversations} conversations × ${DATA.summary.turns} turns · concurrency ${DATA.summary.concurrency} · page ${DATA.summary.page_size} · ${total.toFixed(1)}s · ${DATA.summary.errors} errors`;
+function elem(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+  parent.append(e);
+  return e;
+}
+function text(parent, x, y, s, extra = {}) {
+  const e = elem(
+    "text",
+    { x, y, fill: "var(--muted)", "font-size": 12, ...extra },
+    parent,
+  );
+  e.textContent = s;
+  return e;
+}
+function fmt(v) {
+  if (v === null || v === undefined) return "Unavailable";
+  return Math.abs(v) >= 1000
+    ? (v / 1000).toFixed(1) + "k"
+    : Math.abs(v) >= 10
+      ? v.toFixed(1)
+      : v.toFixed(2);
+}
+function details() {
+  if (!selected) {
+    $("#selected-title").textContent = "No request records";
+    return;
+  }
+  $("#request").value = String(DATA.rows.indexOf(selected));
+  $("#selected-title").textContent =
+    `Conversation ${selected.conversation} · Turn ${selected.turn} · Worker ${selected.worker ?? "unknown"}`;
+  $("#availability").textContent = [
+    selected.error ? "Failed: " + selected.error : "",
+    selected.unavailable.length
+      ? "Phase timestamps unavailable: " + selected.unavailable.join(", ")
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const fields = [
+    ["Context", fmt(selected.context) + " tokens"],
+    ["Output", fmt(selected.output) + " tokens"],
+    [
+      "Sampling",
+      fmt(selected.latency == null ? null : selected.latency * 1000) + " ms",
+    ],
+    ["TTFT", fmt(selected.ttft == null ? null : selected.ttft * 1000) + " ms"],
+    [
+      "Client wait",
+      fmt(selected.wait == null ? null : selected.wait * 1000) + " ms",
+    ],
+    [
+      "GPU / CPU hits",
+      `${selected.hits.device ?? "N/A"} / ${selected.hits.host ?? "N/A"} tokens`,
+    ],
+  ];
+  $("#details").replaceChildren();
+  for (const [label, value] of fields) {
+    const field = document.createElement("div");
+    const name = document.createElement("span");
+    const content = document.createElement("strong");
+    name.textContent = label;
+    content.textContent = value;
+    field.append(name, content);
+    $("#details").append(field);
+  }
+}
+function drawTimeline() {
+  const svg = $("#timeline");
+  if ($("#timeline-panel").hidden) return;
+  let w = svg.parentElement.clientWidth,
+    L = w < 500 ? 70 : 112,
+    R = 12,
+    h =
+      102 +
+      lanes.length * 33 +
+      new Set(lanes.map((lane) => lane.worker)).size * 24;
+  const x = (t) => L + ((t - start) / span) * (w - L - R);
+  svg.replaceChildren();
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.style.width = "100%";
+  svg.style.height = h + "px";
+  let ticks = w < 500 ? 3 : 6;
+  for (let i = 0; i <= ticks; i++) {
+    let t = start + (span * i) / ticks,
+      px = x(t);
+    elem(
+      "line",
+      { x1: px, x2: px, y1: 25, y2: h - 30, stroke: "var(--line)" },
+      svg,
+    );
+    text(svg, px, 15, t.toFixed(span < 3 ? 2 : 1) + "s", {
+      "text-anchor": i === 0 ? "start" : i === ticks ? "end" : "middle",
+    });
+  }
+  let groupIndex = -1;
+  for (let lane = 0; lane < lanes.length; lane++) {
+    let { conversation: c, worker } = lanes[lane];
+    const startsGroup = lane === 0 || lanes[lane - 1].worker !== worker;
+    if (startsGroup) groupIndex++;
+    let y = 66 + lane * 33 + groupIndex * 24;
+    if (startsGroup)
+      text(
+        svg,
+        0,
+        y - 5,
+        worker === null ? "Worker unknown" : "Worker " + worker,
+        { "font-size": 10 },
+      );
+    text(svg, 4, y + 14, "Convo " + c);
+    for (const r of DATA.rows.filter(
+      (v) => v.conversation === c && v.worker === worker,
+    )) {
+      for (const p of r.phases) {
+        let a = Math.max(start, p.start),
+          b = Math.min(start + span, p.end);
+        if (b <= a) continue;
+        let fill =
+          p.type === "Sampling"
+            ? "var(--sampling)"
+            : p.type === "Tool call"
+              ? "var(--tool)"
+              : "var(--wait)";
+        const g = elem(
+          "g",
+          {
+            role: "button",
+            "aria-label": `Conversation ${c} turn ${r.turn} ${p.type}, ${((p.end - p.start) * 1000).toFixed(2)} ms`,
+            tabindex: 0,
+          },
+          svg,
+        );
+        const rect = elem(
+          "rect",
+          {
+            x: x(a),
+            y,
+            width: Math.max(0.4, x(b) - x(a)),
+            height: 22,
+            fill,
+            opacity: selected === r ? 1 : 0.66,
+            rx: 2,
+          },
+          g,
+        );
+        g.style.cursor = "pointer";
+        const choose = () => {
+          selected = r;
+          details();
+          drawTimeline();
+        };
+        g.addEventListener("click", () => {
+          if (!drag?.moved) choose();
+        });
+        g.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") choose();
+        });
+        if (p.type === "Sampling" && x(b) - x(a) > 24)
+          text(g, (x(a) + x(b)) / 2, y + 15, "T" + r.turn, {
+            "text-anchor": "middle",
+            fill: "var(--bg)",
+            "pointer-events": "none",
+          });
+        g.addEventListener("pointermove", (e) => {
+          let tip = $("#tooltip"),
+            bounds = svg.getBoundingClientRect();
+          tip.hidden = false;
+          tip.textContent = `Convo ${c} · Turn ${r.turn}\n${p.type}: ${((p.end - p.start) * 1000).toFixed(2)} ms\n${p.start.toFixed(3)}–${p.end.toFixed(3)}s`;
+          tip.style.left =
+            Math.max(0, Math.min(w - 270, e.clientX - bounds.left + 12)) + "px";
+          tip.style.top = e.clientY - bounds.top + 24 + "px";
+        });
+        g.addEventListener("pointerleave", () => ($("#tooltip").hidden = true));
+      }
+    }
+  }
+  text(svg, (L + w - R) / 2, h - 7, "Elapsed time (seconds)", {
+    "text-anchor": "middle",
+  });
+  svg.onpointerdown = (e) => {
+    let px = e.clientX - svg.getBoundingClientRect().left;
+    if (px < L) return;
+    drag = { px, t: start + ((px - L) / (w - L - R)) * span, moved: false };
+  };
+  svg.onpointermove = (e) => {
+    if (
+      drag &&
+      Math.abs(e.clientX - svg.getBoundingClientRect().left - drag.px) > 8
+    )
+      drag.moved = true;
+  };
+  svg.onpointerup = (e) => {
+    if (drag?.moved) {
+      let px = Math.max(
+          L,
+          Math.min(w - R, e.clientX - svg.getBoundingClientRect().left),
+        ),
+        end = start + ((px - L) / (w - L - R)) * span;
+      start = Math.min(drag.t, end);
+      span = Math.max(0.05, Math.abs(end - drag.t));
+      $("#tooltip").hidden = true;
+      let o = $("#window option[data-custom]");
+      if (!o) {
+        o = document.createElement("option");
+        o.dataset.custom = "1";
+        $("#window").append(o);
+      }
+      o.value = span;
+      o.textContent = span.toFixed(2) + " seconds";
+      $("#window").value = String(span);
+      render();
+    }
+    setTimeout(() => (drag = null), 0);
+  };
+}
+function drawMetrics() {
+  if ($("#metrics-panel").hidden) return;
+  const grid = $("#metric-grid");
+  grid.replaceChildren();
+  let group = null;
+  for (const m of metrics) {
+    if ((m.group || "Topline Metrics") !== group) {
+      group = m.group || "Topline Metrics";
+      let heading = document.createElement("h2");
+      heading.textContent = group;
+      heading.style.cssText = "grid-column:1/-1;font-size:16px;margin:6px 0 0";
+      grid.append(heading);
+    }
+    drawMetricPanel(m, grid);
+  }
+}
+
+function drawMetricPanel(m, grid) {
+  const panel = document.createElement("div");
+  panel.className = "panel";
+  const heading = document.createElement("h3");
+  heading.textContent = m.title;
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", m.title);
+  const legend = document.createElement("div");
+  legend.className = "metric-legend";
+  const source = document.createElement("p");
+  source.className = "source";
+  source.textContent = m.source;
+  panel.append(heading, svg, legend, source);
+  grid.append(panel);
+  let w = panel.clientWidth,
+    h = 160,
+    L = 64,
+    R = 12,
+    T = 20,
+    B = 35;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.style.width = "100%";
+  svg.style.height = h + "px";
+  let vs = m.series.flatMap((s) =>
+    s.points.map((p) => p[1]).filter((v) => v !== null),
+  );
+  let max =
+    m.unit === "%"
+      ? 100
+      : vs.length
+        ? vs.reduce((maximum, value) => Math.max(maximum, value), 0) * 1.08
+        : 1;
+  if (max === 0) max = 1;
+  const x = (t) => L + ((t - start) / span) * (w - L - R),
+    y = (v) => T + (1 - v / max) * (h - T - B);
+  elem(
+    "rect",
+    {
+      x: L,
+      y: T,
+      width: w - L - R,
+      height: h - T - B,
+      fill: "none",
+      stroke: "var(--line)",
+    },
+    svg,
+  );
+  for (let f of [0, 0.5, 1]) {
+    let yy = y(max * f);
+    text(svg, L - 6, yy + 4, fmt(max * f), { "text-anchor": "end" });
+    if (f === 0.5)
+      elem(
+        "line",
+        { x1: L, x2: w - R, y1: yy, y2: yy, stroke: "var(--line)" },
+        svg,
+      );
+  }
+  for (let f of [0, 0.5, 1])
+    text(svg, x(start + span * f), h - 18, (start + span * f).toFixed(1), {
+      "text-anchor": f === 0 ? "start" : f === 1 ? "end" : "middle",
+    });
+  text(svg, L, T - 6, m.unit);
+  text(svg, (L + w - R) / 2, h - 2, "Elapsed time (s)", {
+    "text-anchor": "middle",
+    "font-size": 11,
+  });
+  if (!vs.length)
+    text(svg, (L + w - R) / 2, 76, "Unavailable", {
+      "text-anchor": "middle",
+    });
+  const paths = [];
+  m.series.forEach((s, j) => {
+    let path = "",
+      pen = false;
+    let points = s.points.filter((p) => p[0] >= start && p[0] <= start + span);
+    for (let [t, v] of points) {
+      if (v === null) {
+        pen = false;
+        continue;
+      }
+      path += (pen ? "L" : "M") + x(t) + "," + y(v);
+      pen = true;
+    }
+    let g = elem("g", {}, svg);
+    elem(
+      "path",
+      {
+        d: path,
+        fill: "none",
+        stroke: COLORS[s.color ?? j % 4],
+        "stroke-width": 1.6,
+        "stroke-dasharray": s.dashed ? "5 4" : "",
+      },
+      g,
+    );
+    for (let [t, v] of points)
+      if (v !== null)
+        elem(
+          "circle",
+          { cx: x(t), cy: y(v), r: 2, fill: COLORS[s.color ?? j % 4] },
+          g,
+        );
+    paths.push(g);
+    let b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("aria-pressed", "true");
+    let sw = document.createElement("i");
+    sw.style.background = COLORS[s.color ?? j % 4];
+    if (s.dashed) {
+      sw.style.background = "none";
+      sw.style.borderTop = "2px dashed " + COLORS[s.color ?? j % 4];
+    }
+    b.append(sw, document.createTextNode(s.name));
+    b.onclick = () => {
+      let on = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", on);
+      g.style.display = on ? "" : "none";
+    };
+    legend.append(b);
+  });
+  let guide = elem(
+    "line",
+    { y1: T, y2: h - B, stroke: "var(--muted)", visibility: "hidden" },
+    svg,
+  );
+  svg.addEventListener("pointermove", (e) => {
+    if (!vs.length) return;
+    let px = Math.max(
+        L,
+        Math.min(w - R, e.clientX - svg.getBoundingClientRect().left),
+      ),
+      t = start + ((px - L) / (w - L - R)) * span;
+    guide.setAttribute("x1", px);
+    guide.setAttribute("x2", px);
+    guide.setAttribute("visibility", "visible");
+    const vals = m.series
+      .map((s, j) => {
+        if (paths[j].style.display === "none") return null;
+        let pt = s.points.reduce(
+          (best, p) =>
+            !best || Math.abs(p[0] - t) < Math.abs(best[0] - t) ? p : best,
+          null,
+        );
+        return (
+          s.name +
+          ": " +
+          (pt ? fmt(pt[1]) : "Unavailable") +
+          (pt ? " @ " + pt[0].toFixed(1) + "s" : "")
+        );
+      })
+      .filter(Boolean);
+    source.textContent = vals.join(" · ");
+  });
+  svg.addEventListener("pointerleave", () => {
+    guide.setAttribute("visibility", "hidden");
+    source.textContent = m.source;
+  });
+}
+
+function render() {
+  $("#range").textContent = `${start.toFixed(2)}–${(start + span).toFixed(2)}s`;
+  $("#position").max = Math.max(0, total - span);
+  $("#position").value = start;
+  drawTimeline();
+  drawMetrics();
+}
+for (let b of document.querySelectorAll("[role=tab]"))
+  b.onclick = () => {
+    for (let tab of document.querySelectorAll("[role=tab]")) {
+      const on = b === tab;
+      tab.setAttribute("aria-selected", on);
+      $("#" + tab.getAttribute("aria-controls")).hidden = !on;
+    }
+    render();
+  };
+$("#window").onchange = () => {
+  span = $("#window").value === "all" ? total : Number($("#window").value);
+  span = Math.min(span, total);
+  start = Math.min(start, total - span);
+  render();
+};
+$("#position").oninput = () => {
+  start = Number($("#position").value);
+  render();
+};
+$("#reset").onclick = () => {
+  start = 0;
+  span = total;
+  $("#window").value = "all";
+  render();
+};
+const endpoint = $("#exporter");
+for (const url of Object.keys(DATA.exporters)) {
+  const option = document.createElement("option");
+  option.value = url;
+  option.textContent = url;
+  endpoint.append(option);
+}
+endpoint.onchange = () => {
+  metrics = DATA.exporters[endpoint.value];
+  render();
+};
+$(".badge").textContent =
+  DATA.summary.status.toUpperCase() +
+  " · " +
+  DATA.summary.errors +
+  " recorded errors";
+if (DATA.summary.error) $(".badge").title = DATA.summary.error;
+const requestPicker = $("#request");
+DATA.rows.forEach((row, index) => {
+  const option = document.createElement("option");
+  option.value = index;
+  option.textContent = `Conversation ${row.conversation}, turn ${row.turn}${row.error ? " (failed)" : ""}`;
+  requestPicker.append(option);
+});
+requestPicker.onchange = () => {
+  selected = DATA.rows[Number(requestPicker.value)];
+  details();
+  drawTimeline();
+};
+details();
+new ResizeObserver(render).observe(document.querySelector("main"));
+render();
+;
+    </script>
+  </body>
+</html>
